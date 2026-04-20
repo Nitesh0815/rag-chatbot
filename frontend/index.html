@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus AI · Knowledge Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #05060f;
+            --surface: rgba(255,255,255,0.04);
+            --surface-hover: rgba(255,255,255,0.07);
+            --border: rgba(255,255,255,0.08);
+            --border-bright: rgba(255,255,255,0.15);
+            --accent: #7C6DFA;
+            --accent2: #C084FC;
+            --accent3: #22d3ee;
+            --text: #f0f0f8;
+            --text-muted: rgba(240,240,248,0.45);
+            --text-dim: rgba(240,240,248,0.25);
+            --glow: rgba(124,109,250,0.3);
+            --glow2: rgba(192,132,252,0.2);
+        }
+
+        html, body { height: 100%; overflow: hidden; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+        }
+
+        /* ── ANIMATED BACKGROUND ── */
+        .bg-canvas {
+            position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+        }
+        .orb {
+            position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.3;
+            animation: drift 20s ease-in-out infinite alternate;
+        }
+        .orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, #7C6DFA, transparent); top: -100px; left: -100px; animation-delay: 0s; }
+        .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, #C084FC, transparent); bottom: -80px; right: 200px; animation-delay: -7s; }
+        .orb-3 { width: 300px; height: 300px; background: radial-gradient(circle, #22d3ee, transparent); top: 40%; left: 40%; animation-delay: -12s; opacity: 0.15; }
+
+        @keyframes drift {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(40px, 30px) scale(1.08); }
+        }
+
+        /* Grid overlay */
+        .grid-overlay {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* ── SIDEBAR ── */
+        aside {
+            position: relative; z-index: 10;
+            width: 280px; flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            background: rgba(5,6,15,0.7);
+            backdrop-filter: blur(24px);
+            display: flex; flex-direction: column;
+            transform: translateX(0);
+            transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        aside.hidden-mobile { transform: translateX(-100%); }
+
+        .sidebar-header {
+            height: 64px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex; align-items: center; gap: 10px;
+            font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-icon {
+            width: 32px; height: 32px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px var(--glow);
+        }
+
+        .logo-icon svg { width: 16px; height: 16px; color: white; }
+
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .sidebar-content::-webkit-scrollbar { width: 3px; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 10px; }
+
+        /* Upload Zone */
+        .upload-zone {
+            position: relative;
+            border: 1.5px dashed var(--border-bright);
+            border-radius: 16px;
+            padding: 28px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--surface);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(124,109,250,0.1), rgba(192,132,252,0.05));
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+
+        .upload-zone:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .upload-zone:hover::before { opacity: 1; }
+        .upload-zone.drag-over { border-color: var(--accent2); background: rgba(124,109,250,0.1); }
+
+        .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+        .upload-icon-wrap {
+            width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 12px;
+            background: linear-gradient(135deg, rgba(124,109,250,0.2), rgba(192,132,252,0.1));
+            border: 1px solid rgba(124,109,250,0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .upload-icon-wrap svg { width: 22px; height: 22px; color: var(--accent2); }
+
+        .upload-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .upload-sub { font-size: 12px; color: var(--text-muted); }
+
+        /* Progress */
+        .progress-wrap {
+            display: none; margin-bottom: 20px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 12px;
+        }
+        .progress-wrap.visible { display: block; }
+        .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .progress-track { background: rgba(255,255,255,0.08); border-radius: 99px; height: 3px; }
+        .progress-fill {
+            height: 3px; border-radius: 99px; width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            transition: width 0.4s ease;
+            box-shadow: 0 0 8px var(--glow);
+        }
+
+        /* Section label */
+        .section-label {
+            font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--text-dim);
+            margin-bottom: 10px;
+        }
+
+        /* Doc list */
+        .doc-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+        .doc-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            background: var(--surface); border: 1px solid var(--border);
+            font-size: 13px; color: var(--text-muted);
+            animation: slideIn 0.3s ease;
+        }
+
+        .doc-item svg { flex-shrink: 0; }
+        .doc-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .doc-check { color: #4ade80; flex-shrink: 0; }
+
+        .empty-docs {
+            text-align: center; padding: 24px 0;
+            font-size: 13px; color: var(--text-dim); font-style: italic;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ── MAIN ── */
+        main {
+            position: relative; z-index: 10;
+            flex: 1; display: flex; flex-direction: column;
+            min-width: 0; height: 100%;
+        }
+
+        /* Header */
+        header {
+            height: 64px; flex-shrink: 0;
+            border-bottom: 1px solid var(--border);
+            background: rgba(5,6,15,0.6);
+            backdrop-filter: blur(20px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
+
+        .status-badge {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 12px; font-weight: 500;
+            color: #4ade80;
+            background: rgba(74,222,128,0.1);
+            border: 1px solid rgba(74,222,128,0.2);
+            padding: 5px 12px; border-radius: 99px;
+        }
+        .status-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse-green 2s ease-in-out infinite; }
+        @keyframes pulse-green {
+            0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(74,222,128,0); }
+        }
+
+        .hamburger { display: none; background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; }
+
+        /* Chat area */
+        #chat-container {
+            flex: 1; overflow-y: auto; padding: 32px 24px;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        #chat-container::-webkit-scrollbar { width: 3px; }
+        #chat-container::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 10px; }
+
+        /* Empty state */
+        .empty-state {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center;
+            padding: 60px 20px; animation: fadeUp 0.6s ease;
+        }
+
+        .empty-3d-icon {
+            width: 80px; height: 80px; margin: 0 auto 28px;
+            position: relative;
+        }
+
+        .empty-3d-icon .ring {
+            position: absolute; inset: 0; border-radius: 50%;
+            border: 1.5px solid transparent;
+            animation: spin3d 6s linear infinite;
+        }
+        .ring-1 { border-top-color: var(--accent); border-right-color: var(--accent); animation-duration: 4s; }
+        .ring-2 { border-bottom-color: var(--accent2); border-left-color: var(--accent2); inset: 10px; animation-direction: reverse; animation-duration: 5s; }
+        .ring-3 { border-top-color: var(--accent3); inset: 20px; animation-duration: 3s; }
+
+        .ring-core {
+            position: absolute; inset: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px var(--glow), 0 0 60px var(--glow2);
+        }
+        .ring-core svg { width: 14px; height: 14px; color: white; }
+
+        @keyframes spin3d {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        .empty-title {
+            font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px;
+            letter-spacing: -0.03em; margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--text), var(--text-muted));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .empty-sub { font-size: 14px; color: var(--text-muted); max-width: 340px; line-height: 1.7; }
+
+        /* Suggestion pills */
+        .suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 28px; }
+        .suggestion-pill {
+            padding: 8px 16px; border-radius: 99px; font-size: 13px;
+            background: var(--surface); border: 1px solid var(--border);
+            color: var(--text-muted); cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .suggestion-pill:hover {
+            border-color: var(--accent); color: var(--text);
+            background: rgba(124,109,250,0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(124,109,250,0.2);
+        }
+
+        /* Messages */
+        .msg-row { display: flex; animation: fadeUp 0.35s ease; }
+        .msg-row.user { justify-content: flex-end; }
+        .msg-row.ai   { justify-content: flex-start; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .bubble {
+            max-width: 72%; padding: 14px 18px; border-radius: 20px;
+            font-size: 14px; line-height: 1.7;
+        }
+
+        .bubble.user {
+            background: linear-gradient(135deg, var(--accent), #6057d4);
+            color: white; border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 24px rgba(124,109,250,0.35);
+        }
+
+        .bubble.ai {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text); border-bottom-left-radius: 4px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .ai-bubble-inner { display: flex; align-items: flex-start; gap: 12px; }
+
+        .ai-avatar {
+            width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 12px var(--glow);
+        }
+        .ai-avatar svg { width: 14px; height: 14px; color: white; }
+
+        /* Typing indicator */
+        #typing-indicator .bubble.ai { padding: 16px 20px; }
+        .typing-dots { display: flex; gap: 5px; align-items: center; }
+        .typing-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent2);
+            animation: bounce 1.2s ease-in-out infinite;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes bounce {
+            0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-6px); opacity: 1; }
+        }
+
+        /* Input area */
+        .input-area {
+            padding: 16px 24px 20px;
+            background: rgba(5,6,15,0.8);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border);
+        }
+
+        .input-wrap {
+            max-width: 860px; margin: 0 auto;
+            display: flex; align-items: flex-end; gap: 10px;
+        }
+
+        .textarea-wrap {
+            flex: 1; position: relative;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            transition: all 0.25s ease;
+            overflow: hidden;
+        }
+
+        .textarea-wrap:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(124,109,250,0.15), 0 0 30px rgba(124,109,250,0.1);
+        }
+
+        .textarea-wrap::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(124,109,250,0.05), transparent);
+            pointer-events: none;
+        }
+
+        textarea {
+            width: 100%; min-height: 48px; max-height: 130px;
+            background: transparent; border: none; outline: none; resize: none;
+            color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+            padding: 13px 16px; line-height: 1.5;
+        }
+        textarea::placeholder { color: var(--text-dim); }
+
+        .send-btn {
+            width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none; cursor: pointer; color: white;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 20px var(--glow);
+            position: relative; overflow: hidden;
+        }
+
+        .send-btn::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: rgba(255,255,255,0.15);
+            opacity: 0; transition: opacity 0.2s;
+        }
+
+        .send-btn:hover { transform: scale(1.05); box-shadow: 0 6px 28px var(--glow); }
+        .send-btn:hover::before { opacity: 1; }
+        .send-btn:active { transform: scale(0.97); }
+        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+        .send-btn svg { width: 18px; height: 18px; }
+
+        .input-footer { text-align: center; margin-top: 10px; font-size: 11px; color: var(--text-dim); }
+
+        /* Mobile overlay */
+        .mob-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+        }
+        .mob-overlay.visible { display: block; }
+
+        /* Floating particles */
+        .particle {
+            position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+            animation: float-particle linear infinite;
+            opacity: 0;
+        }
+        @keyframes float-particle {
+            0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+            10%  { opacity: 0.6; }
+            90%  { opacity: 0.3; }
+            100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            aside {
+                position: fixed; inset-y: 0; left: 0; z-index: 20;
+                transform: translateX(-100%);
+                transition: transform 0.4s cubic-bezier(0.16,1,0.3,1);
+            }
+            aside.open { transform: translateX(0); }
+            .hamburger { display: flex; }
+            #chat-container { padding: 20px 16px; }
+            .input-area { padding: 12px 16px 16px; }
+            .bubble { max-width: 88%; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Background -->
+<div class="bg-canvas">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<!-- Particles container -->
+<div id="particles"></div>
+
+<!-- Mobile overlay -->
+<div class="mob-overlay" id="mob-overlay"></div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <div class="logo-icon">
+                <i data-lucide="zap"></i>
+            </div>
+            Knowledge Base
+        </div>
+        <button id="close-sidebar" class="hamburger">
+            <i data-lucide="x" style="width:18px;height:18px;"></i>
+        </button>
+    </div>
+
+    <div class="sidebar-content">
+        <div class="upload-zone" id="drop-zone">
+            <input type="file" id="file-upload" accept="application/pdf">
+            <div class="upload-icon-wrap">
+                <i data-lucide="upload-cloud"></i>
+            </div>
+            <div class="upload-title">Upload PDF</div>
+            <div class="upload-sub">Drag & drop or click to browse</div>
+        </div>
+
+        <div class="progress-wrap" id="upload-progress">
+            <div class="progress-top">
+                <span id="upload-filename" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;">document.pdf</span>
+                <span id="upload-percent">0%</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="section-label">Documents</div>
+        <ul class="doc-list" id="doc-list">
+            <li class="empty-docs" id="empty-docs">No documents yet</li>
+        </ul>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main>
+    <header>
+        <div class="header-left">
+            <button class="hamburger" id="open-sidebar">
+                <i data-lucide="menu" style="width:22px;height:22px;"></i>
+            </button>
+            <div class="header-title">Nexus <span style="background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">AI</span></div>
+        </div>
+        <div class="status-badge">
+            <div class="status-dot"></div>
+            System Online
+        </div>
+    </header>
+
+    <div id="chat-container">
+        <div class="empty-state" id="empty-state">
+            <div class="empty-3d-icon">
+                <div class="ring ring-1"></div>
+                <div class="ring ring-2"></div>
+                <div class="ring ring-3"></div>
+                <div class="ring-core"><i data-lucide="sparkles"></i></div>
+            </div>
+            <div class="empty-title">What can I find for you?</div>
+            <div class="empty-sub">Upload a PDF from the sidebar and ask anything — I'll pull the exact answers from your documents.</div>
+            <div class="suggestions">
+                <div class="suggestion-pill" onclick="fillInput(this)">Summarize the document</div>
+                <div class="suggestion-pill" onclick="fillInput(this)">What are the key findings?</div>
+                <div class="suggestion-pill" onclick="fillInput(this)">List the main topics</div>
+                <div class="suggestion-pill" onclick="fillInput(this)">Give me a quick overview</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="input-wrap">
+            <div class="textarea-wrap">
+                <textarea id="chat-input" rows="1" placeholder="Ask anything about your documents..."></textarea>
+            </div>
+            <button class="send-btn" id="send-btn" disabled>
+                <i data-lucide="send"></i>
+            </button>
+        </div>
+        <div class="input-footer">AI responses may contain inaccuracies — always verify with source documents.</div>
+    </div>
+</main>
+
+<script>
+lucide.createIcons();
+
+// ── DOM refs ──
+const chatContainer = document.getElementById('chat-container');
+const chatInput     = document.getElementById('chat-input');
+const sendBtn       = document.getElementById('send-btn');
+const emptyState    = document.getElementById('empty-state');
+const fileUpload    = document.getElementById('file-upload');
+const dropZone      = document.getElementById('drop-zone');
+const docList       = document.getElementById('doc-list');
+const emptyDocs     = document.getElementById('empty-docs');
+const sidebar       = document.getElementById('sidebar');
+const mobOverlay    = document.getElementById('mob-overlay');
+const API_URL       = 'http://3.95.231.195:8000';
+
+// ── Particles ──
+(function spawnParticles() {
+    const container = document.getElementById('particles');
+    const colors = ['rgba(124,109,250,0.5)','rgba(192,132,252,0.5)','rgba(34,211,238,0.4)'];
+    for (let i = 0; i < 18; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const size = 2 + Math.random() * 4;
+        p.style.cssText = `
+            width:${size}px; height:${size}px;
+            left:${Math.random()*100}vw;
+            background:${colors[Math.floor(Math.random()*colors.length)]};
+            animation-duration:${10+Math.random()*18}s;
+            animation-delay:-${Math.random()*20}s;
+        `;
+        container.appendChild(p);
+    }
+})();
+
+// ── Sidebar toggle ──
+function openSidebar()  { sidebar.classList.add('open'); mobOverlay.classList.add('visible'); }
+function closeSidebar() { sidebar.classList.remove('open'); mobOverlay.classList.remove('visible'); }
+document.getElementById('open-sidebar').addEventListener('click', openSidebar);
+document.getElementById('close-sidebar').addEventListener('click', closeSidebar);
+mobOverlay.addEventListener('click', closeSidebar);
+
+// ── Textarea auto-resize ──
+chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = chatInput.scrollHeight + 'px';
+    sendBtn.disabled = chatInput.value.trim() === '';
+});
+
+// ── Suggestion pills ──
+function fillInput(el) {
+    chatInput.value = el.textContent;
+    chatInput.dispatchEvent(new Event('input'));
+    chatInput.focus();
+}
+
+// ── Drag & drop ──
+['dragenter','dragover','dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); }));
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, () => dropZone.classList.add('drag-over')));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, () => dropZone.classList.remove('drag-over')));
+dropZone.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+fileUpload.addEventListener('change', () => handleFiles(fileUpload.files));
+
+function handleFiles(files) {
+    const f = files[0];
+    if (!f || f.type !== 'application/pdf') { alert('Please upload a valid PDF.'); return; }
+    uploadFile(f);
+}
+
+async function uploadFile(file) {
+    const progressWrap = document.getElementById('upload-progress');
+    const progressBar  = document.getElementById('progress-bar');
+    const percentText  = document.getElementById('upload-percent');
+    const filenameText = document.getElementById('upload-filename');
+
+    filenameText.textContent = file.name;
+    progressWrap.classList.add('visible');
+    progressBar.style.width = '30%';
+    percentText.textContent = 'Uploading…';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('Upload failed');
+        progressBar.style.width = '100%';
+        percentText.textContent = '100%';
+        setTimeout(() => {
+            progressWrap.classList.remove('visible');
+            addDocToList(file.name);
+        }, 900);
+    } catch (err) {
+        console.error(err);
+        percentText.textContent = 'Error';
+        percentText.style.color = '#f87171';
+        progressBar.style.background = '#f87171';
+        setTimeout(() => {
+            progressWrap.classList.remove('visible');
+            percentText.style.color = '';
+            progressBar.style.background = '';
+        }, 3000);
+    }
+}
+
+function addDocToList(name) {
+    emptyDocs.style.display = 'none';
+    const li = document.createElement('li');
+    li.className = 'doc-item';
+    li.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent2)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span>${name}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="doc-check"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    `;
+    docList.appendChild(li);
+}
+
+// ── Chat logic ──
+let waiting = false;
+
+function appendMsg(role, content) {
+    emptyState.style.display = 'none';
+    const row = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    if (role === 'user') {
+        const b = document.createElement('div');
+        b.className = 'bubble user';
+        b.textContent = content;
+        row.appendChild(b);
+    } else {
+        const b = document.createElement('div');
+        b.className = 'bubble ai';
+        const formatted = content.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+        b.innerHTML = `<div class="ai-bubble-inner">
+            <div class="ai-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/></svg></div>
+            <div>${formatted}</div>
+        </div>`;
+        row.appendChild(b);
+    }
+    chatContainer.appendChild(row);
+    chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+}
+
+function showTyping() {
+    const row = document.createElement('div');
+    row.id = 'typing-indicator';
+    row.className = 'msg-row ai';
+    row.innerHTML = `<div class="bubble ai">
+        <div class="ai-bubble-inner">
+            <div class="ai-avatar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/></svg></div>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    </div>`;
+    chatContainer.appendChild(row);
+    chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+}
+
+function removeTyping() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+}
+
+async function handleSend() {
+    const text = chatInput.value.trim();
+    if (!text || waiting) return;
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    sendBtn.disabled = true;
+    waiting = true;
+
+    appendMsg('user', text);
+    showTyping();
+
+    try {
+        const res = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: text })
+        });
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        removeTyping();
+        appendMsg('ai', data.answer || 'I received an empty response.');
+    } catch (err) {
+        console.error(err);
+        removeTyping();
+        appendMsg('ai', '⚠️ **Connection Error:** Unable to reach the backend. Make sure your API server is running.');
+    } finally {
+        waiting = false;
+        chatInput.focus();
+    }
+}
+
+sendBtn.addEventListener('click', handleSend);
+chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+</script>
+</body>
+</html>
