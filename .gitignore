@@ -10,3 +10,4 @@ __pycache__/
 temp_*.pdf
 .pytest_cache/
 *.pyc
+.env.example
