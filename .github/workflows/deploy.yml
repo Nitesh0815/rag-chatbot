@@ -14,10 +14,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          driver-opts: |
-            image=moby/buildkit:latest
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -39,8 +35,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           script: |
+            cd /home/ubuntu/rag-chatbot
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/rag-chatbot:latest
-            cd /home/ubuntu/rag-chatbot  # Adjust path as needed
             echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > .env
-            docker-compose down
-            docker-compose up -d
+            echo "COLLECTION_NAME=rag_docs" >> .env
+            docker compose down
+            docker compose up -d
